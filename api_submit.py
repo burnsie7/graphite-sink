@@ -1,6 +1,6 @@
 import time
-import tasks
 import copy
+import os
 import requests
 import random
 from datadog import initialize, api
@@ -28,20 +28,18 @@ def _parseMetrics():
     all_metrics = []
     for metric, val in temp_store.iteritems():
         try:
-            start = time.time()
-            components = metric.split('.')
-            metric_parts = [components[0], components[1], components[5], components[7], components[8]]
             tags = []
-            datacenter = 'datacenter:' + components[2]
-            env = 'env:' + components[3]
-            instance = 'instance:' + components[4]
+            components = metric.split('.')
+
+            datacenter = 'datacenter:' + components.pop(2)
+            env = 'env:' + components.pop(2)
+            instance = 'instance:' + components.pop(2)
             sub_instance = 'subinstance:' + instance.split('_')[1]
-            tenant_id = 'tenant_id:' + components[6]
-            metric = ".".join(metric_parts)
+            tenant_id = 'tenant_id:' + components.pop(3)
             tags = [datacenter, env, instance, sub_instance, tenant_id]
+
+            metric = '.'.join(components)
             all_metrics.append({'metric': metric, 'points': val, 'tags': tags})
-            print "parse = {}".format(str(time.time()-start))
-            print "send  = {}".format(str(time.time()-start))
         except Exception as e:
             print e
     api.Metric.send(all_metrics)
@@ -55,33 +53,31 @@ def _processMetric(metric, datapoint):
     else:
         METRIC_STORE[metric] = val
 
-if __name__ == '__main__':
-    dcs = ['abc', 'def', 'ghi', 'jkl', 'mno']
-    dlen = len(dcs)
-    tid = ['123', '456', '789', '111', '234', '456']
-    tlen = len(tid)
-    ics = ['dsaf_asdf_asdf', 'qewr_qwer_qwer', 'cvxb_xcvb_xcbxv', 'hgjk_fghj_dfghj']
-    ilen = len(ics)
+def _genMetrics():
+    # generate some random metrics names
+    d_list = ['abc', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'stu', 'vwx']
+    t_list = ['123', '456', '789', '101', '112', '131', '415']
+    i_list = ['dsaf_asdf_asdf', 'qewr_qwer_qwer', 'cvxb_xcvb_xcbxv', 'hgjk_fghj_dfghj', 'asdfdgfh_sdfg_sdfg']
+    d_len = len(d_list)
+    t_len = len(t_list)
+    i_len = len(i_list)
     met_list = []
-    for i in range(200):
-        t = tid[random.randint(0, tlen-1)]
-        d = dcs[random.randint(0, dlen-1)]
-        n = ics[random.randint(0, ilen-1)]
+    for i in range(d_len * t_len * i_len):
+        t = t_list[random.randint(0, t_len-1)]
+        d = d_list[random.randint(0, d_len-1)]
+        n = i_list[random.randint(0, i_len-1)]
         met = "zuora.webapp." + d + ".prod." + n + ".storage." + t + ".save.hippo"
         met_list.append(met)
-    mlen = len(met_list)
-    start = time.time()
-    for i in xrange(100000):
-        met = met_list[random.randint(0, mlen-1)]
-        _processMetric(met, (time.time(), 1,))
-    print "proc = {}".format(str(time.time()-start))
-    print "len = {}".format(str(len(METRIC_STORE)))
-    _parseMetrics()
-    end = time.time()
-    print "total = {}".format(str(end-start))
-    #time.sleep(1)
-    #while True:
-    #    for i in xrange(1000):
-    #        _processMetric("zuora.webapp.bbb.prod.1_aspose_prod_slv_zuora.storage.2271.save.hippo", (time.time(), 500,))
-    #    _parseMetrics()
-    #    time.sleep(1)
+    return met_list
+
+if __name__ == '__main__':
+    met_list = _genMetrics()
+    m_len = len(met_list)
+    while True:
+        start = time.time()
+        for i in xrange(10000):
+            met = met_list[random.randint(0, m_len-1)]
+            _processMetric(met, (time.time(), 1,))
+        _parseMetrics()
+        print "time elapsed = {}".format(str(time.time() - start))
+        time.sleep(1)
